@@ -1,0 +1,59 @@
+name: Daily VOD TikTok Notify
+
+on:
+  schedule:
+    # UTC 23:00 = 日本時間 翌8:00 (毎日, 本日終了分)
+    - cron: "0 23 * * *"
+    # UTC(金) 9:30 = 日本時間(金) 18:30 (毎週金曜, 週末に見よう: 金〜日曜までの一覧)
+    - cron: "30 9 * * 5"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "送信モード"
+        required: false
+        default: "daily"
+        type: choice
+        options:
+          - daily
+          - weekend
+      days_ahead:
+        description: "対象日数を直接指定(動作確認用。空欄なら自動計算)"
+        required: false
+        default: ""
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Determine notify mode
+        id: mode
+        run: |
+          if [ "${{ github.event.schedule }}" = "30 9 * * 5" ]; then
+            echo "mode=weekend" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.inputs.mode }}" ]; then
+            echo "mode=${{ github.event.inputs.mode }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=daily" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run notify script
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          ARGS="--mode ${{ steps.mode.outputs.mode }}"
+          if [ -n "${{ github.event.inputs.days_ahead }}" ]; then
+            ARGS="$ARGS --days-ahead ${{ github.event.inputs.days_ahead }}"
+          fi
+          python main.py $ARGS
