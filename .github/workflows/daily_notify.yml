@@ -2,10 +2,10 @@ name: Daily VOD TikTok Notify
 
 on:
   schedule:
-    # UTC 23:00 = 日本時間 翌8:00 (毎日, 本日終了分)
-    - cron: "0 23 * * *"
-    # UTC(金) 9:30 = 日本時間(金) 18:30 (毎週金曜, 週末に見よう: 金〜日曜までの一覧)
-    - cron: "30 9 * * 5"
+    # UTC 15:00 = 日本時間 翌0:00 (毎日, 前倒し通知: 基準日=実行日そのもの)
+    - cron: "0 15 * * *"
+    # UTC(水) 15:00 = 日本時間(木) 0:00 (毎週木曜, 週末前倒し通知: 金〜日曜分。基準日=金曜)
+    - cron: "0 15 * * 3"
   workflow_dispatch:
     inputs:
       mode:
@@ -16,6 +16,10 @@ on:
         options:
           - daily
           - weekend
+      day_offset:
+        description: "基準日オフセット(空欄なら自動: daily=0, weekend=1)"
+        required: false
+        default: ""
       days_ahead:
         description: "対象日数を直接指定(動作確認用。空欄なら自動計算)"
         required: false
@@ -39,20 +43,32 @@ jobs:
       - name: Determine notify mode
         id: mode
         run: |
-          if [ "${{ github.event.schedule }}" = "30 9 * * 5" ]; then
-            echo "mode=weekend" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ github.event.inputs.mode }}" ]; then
-            echo "mode=${{ github.event.inputs.mode }}" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event.schedule }}" = "0 15 * * 3" ]; then
+            MODE=weekend
+            OFFSET=1
+          elif [ "${{ github.event.schedule }}" = "0 15 * * *" ]; then
+            MODE=daily
+            OFFSET=0
           else
-            echo "mode=daily" >> "$GITHUB_OUTPUT"
+            MODE="${{ github.event.inputs.mode }}"
+            if [ -z "$MODE" ]; then MODE=daily; fi
+            if [ -n "${{ github.event.inputs.day_offset }}" ]; then
+              OFFSET="${{ github.event.inputs.day_offset }}"
+            elif [ "$MODE" = "weekend" ]; then
+              OFFSET=1
+            else
+              OFFSET=0
+            fi
           fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "day_offset=$OFFSET" >> "$GITHUB_OUTPUT"
 
       - name: Run notify script
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          ARGS="--mode ${{ steps.mode.outputs.mode }}"
+          ARGS="--mode ${{ steps.mode.outputs.mode }} --day-offset ${{ steps.mode.outputs.day_offset }}"
           if [ -n "${{ github.event.inputs.days_ahead }}" ]; then
             ARGS="$ARGS --days-ahead ${{ github.event.inputs.days_ahead }}"
           fi

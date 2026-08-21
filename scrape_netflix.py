@@ -31,18 +31,20 @@ TITLE_LINK_RE = re.compile(
 THUMBNAIL_RE = re.compile(r'<img[^>]*class="pht-exl25"[^>]*src="([^"]+)"')
 
 
-def fetch_netflix_expiring(target_days_ahead=1):
+def fetch_netflix_expiring(target_days_ahead=1, reference_date=None):
     """
-    target_days_ahead: 今日から何日以内の終了予定を対象にするか
-      0 = 今日終了する作品のみ
-      1 = 今日・明日終了する作品
+    target_days_ahead: 基準日から何日以内の終了予定を対象にするか
+      0 = 基準日に終了する作品のみ
+      1 = 基準日・その翌日に終了する作品
+    reference_date: 基準日(省略時は実行時点の今日)。前倒し通知など、
+      「今日」以外を基準にしたい場合に指定する。
     戻り値: [{"title": str, "date": "MM/DD"}, ...]
     """
     resp = requests.get(URL, headers=HEADERS, timeout=20)
     resp.raise_for_status()
     page_html = resp.text
 
-    today = datetime.datetime.now(JST).date()
+    today = reference_date or datetime.datetime.now(JST).date()
     target_dates = {
         (today + datetime.timedelta(days=i)).strftime("%m/%d")
         for i in range(target_days_ahead + 1)

@@ -41,16 +41,18 @@ def _with_own_tag(amazon_url):
     return TAG_PARAM_RE.sub(f"tag={AMAZON_ASSOCIATE_TAG}", amazon_url)
 
 
-def fetch_prime_expiring(target_days_ahead=1):
+def fetch_prime_expiring(target_days_ahead=1, reference_date=None):
     """
-    target_days_ahead: 今日から何日以内の終了予定を対象にするか
+    target_days_ahead: 基準日から何日以内の終了予定を対象にするか
+    reference_date: 基準日(省略時は実行時点の今日)。前倒し通知など、
+      「今日」以外を基準にしたい場合に指定する。
     戻り値: [{"title": str, "date": "MM/DD", "url": str, "thumbnail": str}, ...]
     """
     resp = requests.get(URL, headers=HEADERS, timeout=20)
     resp.raise_for_status()
     page_html = resp.text
 
-    today = datetime.datetime.now(JST).date()
+    today = reference_date or datetime.datetime.now(JST).date()
     target_dates = {
         (today + datetime.timedelta(days=i)).strftime("%Y-%m-%d"):
             (today + datetime.timedelta(days=i)).strftime("%m/%d")

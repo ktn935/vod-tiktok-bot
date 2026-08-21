@@ -24,8 +24,8 @@ def _this_sunday(today):
     return today + datetime.timedelta(days=(6 - today.weekday()) % 7)
 
 
-def _header_label(mode):
-    today = _today()
+def _header_label(mode, reference_date=None):
+    today = reference_date or _today()
     if mode == "weekend":
         sunday = _this_sunday(today)
         return f"【週末に見よう】{today.strftime('%m/%d')}(金)〜{sunday.strftime('%m/%d')}(日) 配信終了予定"
@@ -46,19 +46,19 @@ def _format_titles(items, with_link=False, show_date=False):
     return "\n".join(lines)
 
 
-def build_netflix_tweet(netflix_items, mode="daily"):
+def build_netflix_tweet(netflix_items, mode="daily", reference_date=None):
     nf_line = _format_titles(netflix_items, with_link=True, show_date=(mode == "weekend"))
     if not nf_line:
         return None
-    header = _header_label(mode)
+    header = _header_label(mode, reference_date)
     return f"🟥{header}\n{CTA}\n🟥Netflix\n{nf_line}\n\n{NETFLIX_HASHTAGS}"
 
 
-def build_prime_tweet(prime_items, mode="daily"):
+def build_prime_tweet(prime_items, mode="daily", reference_date=None):
     pv_line = _format_titles(prime_items, with_link=True, show_date=(mode == "weekend"))
     if not pv_line:
         return None
-    header = _header_label(mode)
+    header = _header_label(mode, reference_date)
     return f"🟦{header}\n{CTA}\n🟦Prime Video\n{pv_line}\n\n{PRIME_HASHTAGS}"
 
 
