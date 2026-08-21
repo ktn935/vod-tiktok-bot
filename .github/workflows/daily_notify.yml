@@ -2,7 +2,7 @@ name: Daily VOD TikTok Notify
 
 on:
   schedule:
-    # UTC 15:00 = 日本時間 翌0:00 (毎日, 前倒し通知: 基準日=実行日そのもの)
+    # UTC 15:00 = 日本時間 翌0:00 (毎日, 前倒し通知: 基準日=実行日の翌日)
     - cron: "0 15 * * *"
     # UTC(水) 15:00 = 日本時間(木) 0:00 (毎週木曜, 週末前倒し通知: 金〜日曜分。基準日=金曜)
     - cron: "0 15 * * 3"
@@ -17,7 +17,7 @@ on:
           - daily
           - weekend
       day_offset:
-        description: "基準日オフセット(空欄なら自動: daily=0, weekend=1)"
+        description: "基準日オフセット(空欄なら自動: daily=1, weekend=1)"
         required: false
         default: ""
       days_ahead:
@@ -48,16 +48,14 @@ jobs:
             OFFSET=1
           elif [ "${{ github.event.schedule }}" = "0 15 * * *" ]; then
             MODE=daily
-            OFFSET=0
+            OFFSET=1
           else
             MODE="${{ github.event.inputs.mode }}"
             if [ -z "$MODE" ]; then MODE=daily; fi
             if [ -n "${{ github.event.inputs.day_offset }}" ]; then
               OFFSET="${{ github.event.inputs.day_offset }}"
-            elif [ "$MODE" = "weekend" ]; then
-              OFFSET=1
             else
-              OFFSET=0
+              OFFSET=1
             fi
           fi
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
