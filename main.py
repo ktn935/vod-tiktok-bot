@@ -36,12 +36,14 @@ def _weekend_days_ahead(reference_date):
     return (6 - reference_date.weekday()) % 7
 
 
-def _handle_send(label, text, items, service, mode, reference_date, dry_run):
+def _handle_send(label, text, items, service, mode, reference_date, days_remaining, dry_run):
     if text is None:
         print(f"[{label}] 対象の作品がありませんでした。送信をスキップします。")
         return
 
-    text_card = make_text_card(items, service, mode=mode, reference_date=reference_date)
+    text_card = make_text_card(
+        items, service, mode=mode, reference_date=reference_date, days_remaining=days_remaining,
+    )
     images = ([text_card] if text_card else []) + make_collages(items, service)
 
     print(f"----- {label} 送信内容 -----")
@@ -93,6 +95,10 @@ def main():
     else:
         days_ahead = 0 if args.mode == "daily" else _weekend_days_ahead(reference_date)
 
+    # このバッチの作品が完全に見れなくなる最終日までの残り日数(コーナーのリボンバッジに使う)
+    deadline_date = reference_date + datetime.timedelta(days=days_ahead)
+    days_remaining = max(1, (deadline_date - actual_today).days)
+
     try:
         netflix_items = fetch_netflix_expiring(target_days_ahead=days_ahead, reference_date=reference_date)
     except Exception as e:
@@ -112,6 +118,7 @@ def main():
         "netflix",
         args.mode,
         reference_date,
+        days_remaining,
         args.dry_run,
     )
     _handle_send(
@@ -121,6 +128,7 @@ def main():
         "prime",
         args.mode,
         reference_date,
+        days_remaining,
         args.dry_run,
     )
 

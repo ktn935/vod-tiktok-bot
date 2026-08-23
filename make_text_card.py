@@ -118,10 +118,32 @@ def _radial_glow(canvas, cx, cy, radius, inner_color, outer_color, steps=90):
         draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=color)
 
 
-def make_text_card(items, service, mode="daily", reference_date=None):
+def _draw_corner_ribbon(canvas, text, band_color, text_color=(255, 255, 255)):
+    """右上コーナーに斜めのリボンバッジ(「あと◯日」等)を貼り付ける"""
+    band_w, band_h = 520, 76
+    ribbon = Image.new("RGBA", (band_w, band_h), (0, 0, 0, 0))
+    rdraw = ImageDraw.Draw(ribbon)
+    rdraw.rectangle([0, 0, band_w, band_h], fill=band_color + (255,))
+
+    font = _font(38)
+    tw = rdraw.textlength(text, font=font)
+    rdraw.text(
+        ((band_w - tw) / 2, (band_h - 38) / 2 - 8), text, font=font, fill=text_color,
+        stroke_width=1, stroke_fill=text_color,
+    )
+
+    rotated = ribbon.rotate(-45, expand=True, resample=Image.BICUBIC)
+    rw, rh = rotated.size
+    x = CANVAS_W - rw + 190
+    y = -rh + 190
+    canvas.paste(rotated, (x, y), rotated)
+
+
+def make_text_card(items, service, mode="daily", reference_date=None, days_remaining=None):
     """
     items: [{"title": str, "date": "MM/DD", ...}, ...]
     service: "netflix" または "prime"
+    days_remaining: 完全に見れなくなるまでの残り日数(右上の斜めリボンバッジに使う)
     戻り値: 1080x1920のPNG画像bytes。itemsが空ならNone。
     """
     if not items:
@@ -153,6 +175,13 @@ def make_text_card(items, service, mode="daily", reference_date=None):
         draw, theme["label"], label_font, cx, 56, fill=theme["label_color"],
         stroke_width=2, stroke_fill=theme["label_color"],
     )
+
+    # ---- 右上コーナーの斜めリボンバッジ(「あと◯日」で緊急性を演出) ----
+    if days_remaining is not None:
+        ribbon_bg = (255, 255, 255) if service == "netflix" else (255, 213, 0)
+        ribbon_text = theme["accent"] if service == "netflix" else (20, 20, 20)
+        _draw_corner_ribbon(canvas, f"あと{days_remaining}日", ribbon_bg, ribbon_text)
+        draw = ImageDraw.Draw(canvas)
 
     header_text = _header_label(mode, reference_date)
     header_font = _font(38)
