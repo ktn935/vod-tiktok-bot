@@ -8,7 +8,7 @@ TikTokは動画のキャプション欄が折りたたまれて読まれにく�
 import io
 import os
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from compose import _header_label, CTA, NETFLIX_HASHTAGS, PRIME_HASHTAGS
 
@@ -118,6 +118,28 @@ def _radial_glow(canvas, cx, cy, radius, inner_color, outer_color, steps=90):
         draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=color)
 
 
+def _draw_drop_shadow(canvas, rect, radius, offset=(0, 10), blur=12, alpha=140):
+    """rect([x0,y0,x1,y1])の角丸矩形の下に、ぼかした影を落として立体感を出す"""
+    pad = blur * 2
+    x0, y0, x1, y1 = rect
+    dx, dy = offset
+    sx0 = max(0, int(x0 - pad))
+    sy0 = max(0, int(y0 - pad + dy))
+    sx1 = min(CANVAS_W, int(x1 + pad))
+    sy1 = min(CANVAS_H, int(y1 + pad + dy))
+    if sx1 <= sx0 or sy1 <= sy0:
+        return
+
+    patch = Image.new("RGBA", (sx1 - sx0, sy1 - sy0), (0, 0, 0, 0))
+    pdraw = ImageDraw.Draw(patch)
+    pdraw.rounded_rectangle(
+        [x0 - sx0 + dx, y0 - sy0 + dy, x1 - sx0 + dx, y1 - sy0 + dy],
+        radius=radius, fill=(0, 0, 0, alpha),
+    )
+    patch = patch.filter(ImageFilter.GaussianBlur(blur))
+    canvas.paste(patch, (sx0, sy0), patch)
+
+
 def _draw_corner_ribbon(canvas, text, band_color, text_color=(255, 255, 255)):
     """右上コーナーに斜めのリボンバッジ(「あと◯日」等)を貼り付ける"""
     band_w, band_h = 520, 76
@@ -219,12 +241,12 @@ def make_text_card(items, service, mode="daily", reference_date=None, days_remai
     for i, (lines, date_str) in enumerate(blocks):
         block_h = max(BADGE_D, len(lines) * TITLE_LINE_H)
         row_top = y
+        card_rect = [MARGIN - 20, row_top - 12, CANVAS_W - MARGIN + 20, row_top + block_h + 12]
+
+        _draw_drop_shadow(canvas, card_rect, radius=20)
 
         card_bg = tuple(min(255, c + 16) for c in theme["bg"])
-        draw.rounded_rectangle(
-            [MARGIN - 20, row_top - 12, CANVAS_W - MARGIN + 20, row_top + block_h + 12],
-            radius=20, fill=card_bg,
-        )
+        draw.rounded_rectangle(card_rect, radius=20, fill=card_bg)
 
         badge_cy = row_top + block_h / 2
         draw.ellipse(
