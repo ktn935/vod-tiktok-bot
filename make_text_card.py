@@ -14,6 +14,8 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from compose import _header_label, CTA, NETFLIX_HASHTAGS, PRIME_HASHTAGS
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), "assets", "fonts", "NotoSansJP-Regular.ttf")
+# 作品タイトルだけ、丸ゴシックでポップに目立つフォントに差し替える(M PLUS Rounded 1c, OFLライセンス)
+TITLE_FONT_PATH = os.path.join(os.path.dirname(__file__), "assets", "fonts", "MPLUSRounded1c-Black.ttf")
 
 CANVAS_W = 1080
 CANVAS_H = 1920
@@ -37,7 +39,7 @@ THEME = {
         "accent": (229, 9, 20),
         "label_color": (229, 9, 20),
         "text": (255, 255, 255),
-        "muted": (170, 170, 170),
+        "muted": (200, 200, 200),
         "badge_text": (229, 9, 20),
         "label": "NETFLIX",
         "hashtags": NETFLIX_HASHTAGS,
@@ -51,7 +53,7 @@ THEME = {
         "accent": (7, 121, 255),
         "label_color": (255, 255, 255),
         "text": (255, 255, 255),
-        "muted": (190, 205, 225),
+        "muted": (210, 222, 238),
         "badge_text": (7, 121, 255),
         "label": "PRIME VIDEO",
         "hashtags": PRIME_HASHTAGS,
@@ -66,11 +68,42 @@ def _font(size):
     return ImageFont.truetype(FONT_PATH, size)
 
 
+def _title_font(size):
+    return ImageFont.truetype(TITLE_FONT_PATH, size)
+
+
 def _center_text(draw, text, font, cx, y, fill, stroke_width=0, stroke_fill=None):
     w = draw.textlength(text, font=font)
     draw.text(
         (cx - w / 2, y), text, font=font, fill=fill,
         stroke_width=stroke_width, stroke_fill=stroke_fill or fill,
+    )
+
+
+def _tracked_width(draw, text, font, tracking=0):
+    """文字間隔(トラッキング)を加味した文字列の描画幅を計算する"""
+    if not text:
+        return 0
+    return sum(draw.textlength(ch, font=font) for ch in text) + tracking * (len(text) - 1)
+
+
+def _draw_tracked_text(draw, text, font, x, y, fill, tracking=0, stroke_width=0, stroke_fill=None):
+    """1文字ずつ間隔を空けて描画する(大きい文字は詰め気味、小さい文字は開き気味にするため)"""
+    cx = x
+    for i, ch in enumerate(text):
+        draw.text(
+            (cx, y), ch, font=font, fill=fill,
+            stroke_width=stroke_width, stroke_fill=stroke_fill or fill,
+        )
+        cx += draw.textlength(ch, font=font)
+        if i < len(text) - 1:
+            cx += tracking
+
+
+def _center_tracked_text(draw, text, font, cx, y, fill, tracking=0, stroke_width=0, stroke_fill=None):
+    total_w = _tracked_width(draw, text, font, tracking)
+    _draw_tracked_text(
+        draw, text, font, cx - total_w / 2, y, fill, tracking, stroke_width, stroke_fill,
     )
 
 
@@ -109,6 +142,22 @@ def _draw_wrapped_center(draw, text, font, cx, y, max_width, fill, max_lines=2, 
         _center_text(draw, line, font, cx, y + i * line_h, fill=fill)
 
 
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F000-\U0001FAFF"
+    "\U00002600-\U000027BF"
+    "\U00002B00-\U00002BFF"
+    "\U0001F1E6-\U0001F1FF"
+    "]+",
+    flags=re.UNICODE,
+)
+
+
+def _strip_emoji(text):
+    """絵文字グリフを持たないフォントで豆腐(□)化するのを防ぐため、絵文字を取り除く"""
+    return _EMOJI_RE.sub("", text).strip()
+
+
 _NUM_TOKEN_RE = re.compile(r"(\d{1,2}[:/]\d{1,2})")
 
 
@@ -124,10 +173,8 @@ def _draw_mixed_line_center(draw, tokens, font, cx, y, base_color, accent_color)
     x = cx - total_w / 2
     for t, is_num in tokens:
         color = accent_color if is_num else base_color
-        draw.text(
-            (x, y), t, font=font, fill=color,
-            stroke_width=1 if is_num else 0, stroke_fill=color,
-        )
+        # 太字フォントを使っていないので、軽いstrokeで重みを足して存在感を出す
+        draw.text((x, y), t, font=font, fill=color, stroke_width=1, stroke_fill=color)
         x += draw.textlength(t, font=font)
 
 
@@ -220,10 +267,10 @@ def make_text_card(items, service, mode="daily", reference_date=None, days_remai
         # (コントラスト比4.4:1)を守るため、ロゴ周りだけは確実に純黒にする。
         draw.rectangle([0, 0, CANVAS_W, BAND_H], fill=(0, 0, 0))
 
-    label_font = _font(56)
-    _center_text(
-        draw, theme["label"], label_font, cx, 56, fill=theme["label_color"],
-        stroke_width=2, stroke_fill=theme["label_color"],
+    label_font = _font(60)
+    _center_tracked_text(
+        draw, theme["label"], label_font, cx, 54, fill=theme["label_color"],
+        tracking=-3, stroke_width=2, stroke_fill=theme["label_color"],
     )
 
     # ---- 右上コーナーの斜めリボンバッジ(「あと◯日」で緊急性を演出) ----
@@ -255,9 +302,9 @@ def make_text_card(items, service, mode="daily", reference_date=None, days_remai
     list_y1 = CANVAS_H - FOOTER_H - 20
     available_h = list_y1 - list_y0
 
-    title_font = _font(TITLE_FONT_SIZE)
+    title_font = _title_font(TITLE_FONT_SIZE)
     date_font = _font(28)
-    badge_font = _font(32)
+    badge_font = _title_font(32)
 
     text_max_w = CANVAS_W - MARGIN * 2 - BADGE_D - 24 - 140
 
@@ -278,12 +325,6 @@ def make_text_card(items, service, mode="daily", reference_date=None, days_remai
     for i, (lines, date_str) in enumerate(blocks):
         block_h = max(BADGE_D, len(lines) * TITLE_LINE_H)
         row_top = y
-        card_rect = [MARGIN - 20, row_top - 12, CANVAS_W - MARGIN + 20, row_top + block_h + 12]
-
-        _draw_drop_shadow(canvas, card_rect, radius=20)
-
-        card_bg = tuple(min(255, c + 16) for c in theme["bg"])
-        draw.rounded_rectangle(card_rect, radius=20, fill=card_bg)
 
         badge_cy = row_top + block_h / 2
         draw.ellipse(
@@ -300,25 +341,26 @@ def make_text_card(items, service, mode="daily", reference_date=None, days_remai
         for li, line in enumerate(lines):
             draw.text(
                 (text_x, text_y + li * TITLE_LINE_H), line, font=title_font,
-                fill=theme["text"], stroke_width=1, stroke_fill=theme["text"],
+                fill=theme["text"],
             )
 
         if date_str:
             date_label = f"{date_str}まで"
-            dw = draw.textlength(date_label, font=date_font)
-            draw.text(
-                (CANVAS_W - MARGIN - 20 - dw, row_top + block_h / 2 - 16),
-                date_label, font=date_font, fill=theme["accent"],
-                stroke_width=1, stroke_fill=theme["accent"],
+            dw = _tracked_width(draw, date_label, date_font, tracking=1)
+            _draw_tracked_text(
+                draw, date_label, date_font,
+                CANVAS_W - MARGIN - 20 - dw, row_top + block_h / 2 - 16,
+                fill=theme["accent"], tracking=1,
+                stroke_width=3, stroke_fill=(255, 255, 255),
             )
 
         y = row_top + block_h + ROW_GAP
 
     if remaining_count > 0:
         note_font = _font(32)
-        _center_text(
+        _center_tracked_text(
             draw, f"ほか {remaining_count} 件は本文参照", note_font, cx, y + 10,
-            fill=theme["muted"],
+            fill=theme["muted"], tracking=1,
         )
 
     # ---- フッター(CTA + ハッシュタグ) ----
@@ -327,12 +369,15 @@ def make_text_card(items, service, mode="daily", reference_date=None, days_remai
 
     cta_font = _font(46)
     _center_text(
-        draw, CTA, cta_font, cx, footer_y0 + 40, fill=(255, 255, 255),
+        draw, _strip_emoji(CTA), cta_font, cx, footer_y0 + 40, fill=(255, 255, 255),
         stroke_width=2, stroke_fill=(255, 255, 255),
     )
 
     tag_font = _font(30)
-    _center_text(draw, theme["hashtags"], tag_font, cx, footer_y0 + 130, fill=theme["muted"])
+    _center_tracked_text(
+        draw, _strip_emoji(theme["hashtags"]), tag_font, cx, footer_y0 + 130,
+        fill=theme["muted"], tracking=1,
+    )
 
     buf = io.BytesIO()
     canvas.save(buf, format="PNG")
