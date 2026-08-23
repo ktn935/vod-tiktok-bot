@@ -27,6 +27,7 @@ from scrape_netflix import fetch_netflix_expiring
 from scrape_prime import fetch_prime_expiring
 from compose import build_netflix_tweet, build_prime_tweet, JST
 from make_collage import make_collages
+from make_text_card import make_text_card
 from telegram_notify import send_content
 
 
@@ -35,17 +36,18 @@ def _weekend_days_ahead(reference_date):
     return (6 - reference_date.weekday()) % 7
 
 
-def _handle_send(label, text, items, service, dry_run):
+def _handle_send(label, text, items, service, mode, reference_date, dry_run):
     if text is None:
         print(f"[{label}] 対象の作品がありませんでした。送信をスキップします。")
         return
 
-    images = make_collages(items, service)
+    text_card = make_text_card(items, service, mode=mode, reference_date=reference_date)
+    images = ([text_card] if text_card else []) + make_collages(items, service)
 
     print(f"----- {label} 送信内容 -----")
     print(text)
     print(f"文字数: {len(text)}")
-    print(f"まとめ画像: {len(images)}枚")
+    print(f"送信画像: {len(images)}枚(文字カード{'あり' if text_card else 'なし'})")
     print("----------------------------")
 
     if dry_run:
@@ -83,7 +85,8 @@ def main():
     )
     args = parser.parse_args()
 
-    reference_date = datetime.datetime.now(JST).date() + datetime.timedelta(days=args.day_offset)
+    actual_today = datetime.datetime.now(JST).date()
+    reference_date = actual_today + datetime.timedelta(days=args.day_offset)
 
     if args.days_ahead is not None:
         days_ahead = args.days_ahead
@@ -107,6 +110,8 @@ def main():
         build_netflix_tweet(netflix_items, mode=args.mode, reference_date=reference_date),
         netflix_items,
         "netflix",
+        args.mode,
+        reference_date,
         args.dry_run,
     )
     _handle_send(
@@ -114,6 +119,8 @@ def main():
         build_prime_tweet(prime_items, mode=args.mode, reference_date=reference_date),
         prime_items,
         "prime",
+        args.mode,
+        reference_date,
         args.dry_run,
     )
 
