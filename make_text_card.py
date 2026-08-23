@@ -7,6 +7,7 @@ TikTokは動画のキャプション欄が折りたたまれて読まれにく�
 """
 import io
 import os
+import re
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
@@ -40,6 +41,8 @@ THEME = {
         "badge_text": (229, 9, 20),
         "label": "NETFLIX",
         "hashtags": NETFLIX_HASHTAGS,
+        # ヘッダーは純黒帯の上に乗るので、アクセントカラー(レッド)がそのまま映える
+        "number_highlight": (229, 9, 20),
     },
     "prime": {
         # 公式ブランドカラー(brandcolorcode.com/amazon-prime-video): Hex #0779FF
@@ -52,6 +55,9 @@ THEME = {
         "badge_text": (7, 121, 255),
         "label": "PRIME VIDEO",
         "hashtags": PRIME_HASHTAGS,
+        # ヘッダーは帯(アクセントカラーそのもの)の上に乗るため、同じ青だと消えてしまう。
+        # リボンバッジと同じ黄色で代わりに強調する。
+        "number_highlight": (255, 213, 0),
     },
 }
 
@@ -101,6 +107,28 @@ def _draw_wrapped_center(draw, text, font, cx, y, max_width, fill, max_lines=2, 
     lines = _wrap_text(draw, text, font, max_width, max_lines)
     for i, line in enumerate(lines):
         _center_text(draw, line, font, cx, y + i * line_h, fill=fill)
+
+
+_NUM_TOKEN_RE = re.compile(r"(\d{1,2}[:/]\d{1,2})")
+
+
+def _split_number_tokens(text):
+    """「08/23」「23:59」のような日付・時刻部分と、それ以外の文字列に分割する"""
+    parts = _NUM_TOKEN_RE.split(text)
+    return [(p, bool(_NUM_TOKEN_RE.fullmatch(p))) for p in parts if p]
+
+
+def _draw_mixed_line_center(draw, tokens, font, cx, y, base_color, accent_color):
+    """日付・時刻部分だけaccent_colorで強調しつつ、1行分を中央揃えで描く"""
+    total_w = sum(draw.textlength(t, font=font) for t, _ in tokens)
+    x = cx - total_w / 2
+    for t, is_num in tokens:
+        color = accent_color if is_num else base_color
+        draw.text(
+            (x, y), t, font=font, fill=color,
+            stroke_width=1 if is_num else 0, stroke_fill=color,
+        )
+        x += draw.textlength(t, font=font)
 
 
 def _mix(c1, c2, t):
@@ -207,10 +235,19 @@ def make_text_card(items, service, mode="daily", reference_date=None, days_remai
 
     header_text = _header_label(mode, reference_date)
     header_font = _font(38)
-    _draw_wrapped_center(
-        draw, header_text, header_font, cx, 160, CANVAS_W - MARGIN * 2,
-        fill=theme["text"], max_lines=2, line_h=48,
-    )
+    header_max_w = CANVAS_W - MARGIN * 2
+    header_tokens = _split_number_tokens(header_text)
+    header_full_w = sum(draw.textlength(t, font=header_font) for t, _ in header_tokens)
+    if header_full_w <= header_max_w:
+        _draw_mixed_line_center(
+            draw, header_tokens, header_font, cx, 160,
+            theme["text"], theme["number_highlight"],
+        )
+    else:
+        _draw_wrapped_center(
+            draw, header_text, header_font, cx, 160, header_max_w,
+            fill=theme["text"], max_lines=2, line_h=48,
+        )
 
     # ---- 作品リスト(カード風の行を積み上げる) ----
     show_date = (mode == "weekend")
@@ -271,7 +308,8 @@ def make_text_card(items, service, mode="daily", reference_date=None, days_remai
             dw = draw.textlength(date_label, font=date_font)
             draw.text(
                 (CANVAS_W - MARGIN - 20 - dw, row_top + block_h / 2 - 16),
-                date_label, font=date_font, fill=theme["muted"],
+                date_label, font=date_font, fill=theme["accent"],
+                stroke_width=1, stroke_fill=theme["accent"],
             )
 
         y = row_top + block_h + ROW_GAP
