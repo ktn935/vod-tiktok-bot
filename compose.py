@@ -11,8 +11,14 @@ import datetime
 
 JST = datetime.timezone(datetime.timedelta(hours=9))
 
-NETFLIX_HASHTAGS = "#Netflix #NetflixJP #配信終了予定"
-PRIME_HASHTAGS = "#AmazonPrimeVideo #プライムビデオ #配信終了予定"
+NETFLIX_HASHTAGS = (
+    "#Netflix #NetflixJP #配信終了予定 #映画好きと繋がりたい #ドラマ好きと繋がりたい "
+    "#おすすめ映画 #サブスク #Netflixおすすめ #ネトフリ"
+)
+PRIME_HASHTAGS = (
+    "#AmazonPrimeVideo #プライムビデオ #配信終了予定 #映画好きと繋がりたい #ドラマ好きと繋がりたい "
+    "#おすすめ映画 #サブスク #プライムビデオおすすめ #アマプラ"
+)
 CTA = "👉今のうちにマイリスト追加"
 
 
