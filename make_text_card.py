@@ -277,7 +277,8 @@ def make_text_card(items, service, mode="daily", reference_date=None, days_remai
     if days_remaining is not None:
         ribbon_bg = (255, 255, 255) if service == "netflix" else (255, 213, 0)
         ribbon_text = theme["accent"] if service == "netflix" else (20, 20, 20)
-        _draw_corner_ribbon(canvas, f"あと{days_remaining}日", ribbon_bg, ribbon_text)
+        ribbon_label = "本日ラスト" if days_remaining <= 0 else f"あと{days_remaining}日"
+        _draw_corner_ribbon(canvas, ribbon_label, ribbon_bg, ribbon_text)
         draw = ImageDraw.Draw(canvas)
 
     header_text = _header_label(mode, reference_date)
